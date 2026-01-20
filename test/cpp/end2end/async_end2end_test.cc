@@ -26,7 +26,6 @@
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
-#include <grpcpp/support/channel_arguments.h>
 
 #include <cinttypes>
 #include <memory>
@@ -44,7 +43,6 @@
 #include "test/core/test_util/build.h"
 #include "test/core/test_util/port.h"
 #include "test/core/test_util/test_config.h"
-#include "test/cpp/end2end/end2end_test_utils.h"
 #include "test/cpp/util/string_ref_helper.h"
 #include "test/cpp/util/test_credentials_provider.h"
 #include "absl/log/log.h"
@@ -67,9 +65,6 @@ namespace testing {
 
 namespace {
 
-// Change this to LOG(INFO) to debug this test. Do not submit LOG(INFO).
-#define GRPC_TESTING_LOCAL_LOG VLOG(3)
-
 void* tag(int t) { return reinterpret_cast<void*>(t); }
 int detag(void* p) { return static_cast<int>(reinterpret_cast<intptr_t>(p)); }
 
@@ -78,10 +73,9 @@ class Verifier {
   Verifier() : lambda_run_(false) {}
   // Expect sets the expected ok value for a specific tag
   Verifier& Expect(
-      int tag, bool expect_ok,
+      int i, bool expect_ok,
       grpc_core::SourceLocation whence = grpc_core::SourceLocation()) {
-    GRPC_TESTING_LOCAL_LOG << "Expect tag " << tag;
-    return ExpectUnless(tag, expect_ok, false, whence);
+    return ExpectUnless(i, expect_ok, false, whence);
   }
   // ExpectUnless sets the expected ok value for a specific tag
   // unless the tag was already marked seen (as a result of ExpectMaybe)
@@ -110,10 +104,7 @@ class Verifier {
   int Next(CompletionQueue* cq, bool ignore_ok) {
     bool ok;
     void* got_tag;
-    GRPC_TESTING_LOCAL_LOG << "Next: waiting for next tag";
     EXPECT_TRUE(cq->Next(&got_tag, &ok));
-    GRPC_TESTING_LOCAL_LOG << "Next: got tag " << detag(got_tag)
-                           << ", ok=" << ok;
     GotTag(got_tag, ok, ignore_ok);
     return detag(got_tag);
   }
@@ -150,19 +141,14 @@ class Verifier {
     if (expectations_.empty()) {
       bool ok;
       void* got_tag;
-      GRPC_TESTING_LOCAL_LOG << "Verify: waiting for timeout";
       EXPECT_EQ(cq->AsyncNext(&got_tag, &ok, deadline),
                 CompletionQueue::TIMEOUT);
-      GRPC_TESTING_LOCAL_LOG << "Verify: got timeout as expected";
     } else {
       while (!expectations_.empty()) {
         bool ok;
         void* got_tag;
-        GRPC_TESTING_LOCAL_LOG << "Verify: waiting for tag";
         EXPECT_EQ(cq->AsyncNext(&got_tag, &ok, deadline),
                   CompletionQueue::GOT_EVENT);
-        GRPC_TESTING_LOCAL_LOG << "Verify: got tag " << detag(got_tag)
-                               << ", ok=" << ok;
         GotTag(got_tag, ok, false);
       }
     }
@@ -178,19 +164,14 @@ class Verifier {
     if (expectations_.empty()) {
       bool ok;
       void* got_tag;
-      GRPC_TESTING_LOCAL_LOG << "Verify(lambda): waiting for timeout";
       EXPECT_EQ(DoOnceThenAsyncNext(cq, &got_tag, &ok, deadline, lambda),
                 CompletionQueue::TIMEOUT);
-      GRPC_TESTING_LOCAL_LOG << "Verify(lambda): got timeout as expected";
     } else {
       while (!expectations_.empty()) {
         bool ok;
         void* got_tag;
-        GRPC_TESTING_LOCAL_LOG << "Verify(lambda): waiting for tag";
         EXPECT_EQ(DoOnceThenAsyncNext(cq, &got_tag, &ok, deadline, lambda),
                   CompletionQueue::GOT_EVENT);
-        GRPC_TESTING_LOCAL_LOG << "Verify(lambda): got tag " << detag(got_tag)
-                               << ", ok=" << ok;
         GotTag(got_tag, ok, false);
       }
     }
@@ -349,7 +330,6 @@ class AsyncEnd2endTest : public ::testing::TestWithParam<TestScenario> {
 
   void ResetStub() {
     ChannelArguments args;
-    ApplyCommonChannelArguments(args);
     auto channel_creds = GetCredentialsProvider()->GetChannelCredentials(
         GetParam().credentials_type, &args);
     std::shared_ptr<Channel> channel =
@@ -992,15 +972,12 @@ TEST_P(AsyncEnd2endTest, ClientInitialMetadataRpc) {
   Verifier().Expect(2, true).Verify(cq_.get());
   EXPECT_EQ(send_request.message(), recv_request.message());
   const auto& client_initial_metadata = srv_ctx.client_metadata();
-  EXPECT_EQ(
-      meta1.second,
-      ToString(client_initial_metadata.equal_range(meta1.first).first->second));
-  EXPECT_EQ(
-      meta2.second,
-      ToString(client_initial_metadata.equal_range(meta2.first).first->second));
-  EXPECT_EQ(
-      meta3.second,
-      ToString(client_initial_metadata.equal_range(meta3.first).first->second));
+  EXPECT_EQ(meta1.second,
+            ToString(client_initial_metadata.find(meta1.first)->second));
+  EXPECT_EQ(meta2.second,
+            ToString(client_initial_metadata.find(meta2.first)->second));
+  EXPECT_EQ(meta3.second,
+            ToString(client_initial_metadata.find(meta3.first)->second));
   EXPECT_GE(client_initial_metadata.size(), 2);
 
   send_response.set_message(recv_request.message());
@@ -1041,12 +1018,10 @@ TEST_P(AsyncEnd2endTest, ServerInitialMetadataRpc) {
   response_writer.SendInitialMetadata(tag(3));
   Verifier().Expect(3, true).Expect(4, true).Verify(cq_.get());
   const auto& server_initial_metadata = cli_ctx.GetServerInitialMetadata();
-  EXPECT_EQ(
-      meta1.second,
-      ToString(server_initial_metadata.equal_range(meta1.first).first->second));
-  EXPECT_EQ(
-      meta2.second,
-      ToString(server_initial_metadata.equal_range(meta2.first).first->second));
+  EXPECT_EQ(meta1.second,
+            ToString(server_initial_metadata.find(meta1.first)->second));
+  EXPECT_EQ(meta2.second,
+            ToString(server_initial_metadata.find(meta2.first)->second));
   EXPECT_EQ(2, server_initial_metadata.size());
 
   send_response.set_message(recv_request.message());
@@ -1086,12 +1061,10 @@ TEST_P(AsyncEnd2endTest, ServerInitialMetadataServerStreaming) {
   srv_stream.SendInitialMetadata(tag(10));
   Verifier().Expect(10, true).Expect(11, true).Verify(cq_.get());
   auto server_initial_metadata = cli_ctx.GetServerInitialMetadata();
-  EXPECT_EQ(
-      meta1.second,
-      ToString(server_initial_metadata.equal_range(meta1.first).first->second));
-  EXPECT_EQ(
-      meta2.second,
-      ToString(server_initial_metadata.equal_range(meta2.first).first->second));
+  EXPECT_EQ(meta1.second,
+            ToString(server_initial_metadata.find(meta1.first)->second));
+  EXPECT_EQ(meta2.second,
+            ToString(server_initial_metadata.find(meta2.first)->second));
   EXPECT_EQ(2, server_initial_metadata.size());
 
   srv_stream.Write(send_response, tag(3));
@@ -1148,12 +1121,10 @@ TEST_P(AsyncEnd2endTest, ServerInitialMetadataServerStreamingImplicit) {
   EXPECT_EQ(send_response.message(), recv_response.message());
 
   auto server_initial_metadata = cli_ctx.GetServerInitialMetadata();
-  EXPECT_EQ(
-      meta1.second,
-      ToString(server_initial_metadata.equal_range(meta1.first).first->second));
-  EXPECT_EQ(
-      meta2.second,
-      ToString(server_initial_metadata.equal_range(meta2.first).first->second));
+  EXPECT_EQ(meta1.second,
+            ToString(server_initial_metadata.find(meta1.first)->second));
+  EXPECT_EQ(meta2.second,
+            ToString(server_initial_metadata.find(meta2.first)->second));
   EXPECT_EQ(2, server_initial_metadata.size());
 
   srv_stream.Write(send_response, tag(5));
@@ -1208,14 +1179,10 @@ TEST_P(AsyncEnd2endTest, ServerTrailingMetadataRpc) {
   EXPECT_EQ(send_response.message(), recv_response.message());
   EXPECT_TRUE(recv_status.ok());
   const auto& server_trailing_metadata = cli_ctx.GetServerTrailingMetadata();
-  EXPECT_EQ(
-      meta1.second,
-      ToString(
-          server_trailing_metadata.equal_range(meta1.first).first->second));
-  EXPECT_EQ(
-      meta2.second,
-      ToString(
-          server_trailing_metadata.equal_range(meta2.first).first->second));
+  EXPECT_EQ(meta1.second,
+            ToString(server_trailing_metadata.find(meta1.first)->second));
+  EXPECT_EQ(meta2.second,
+            ToString(server_trailing_metadata.find(meta2.first)->second));
   EXPECT_EQ(2, server_trailing_metadata.size());
 }
 
@@ -1260,12 +1227,10 @@ TEST_P(AsyncEnd2endTest, MetadataRpc) {
   Verifier().Expect(2, true).Verify(cq_.get());
   EXPECT_EQ(send_request.message(), recv_request.message());
   const auto& client_initial_metadata = srv_ctx.client_metadata();
-  EXPECT_EQ(
-      meta1.second,
-      ToString(client_initial_metadata.equal_range(meta1.first).first->second));
-  EXPECT_EQ(
-      meta2.second,
-      ToString(client_initial_metadata.equal_range(meta2.first).first->second));
+  EXPECT_EQ(meta1.second,
+            ToString(client_initial_metadata.find(meta1.first)->second));
+  EXPECT_EQ(meta2.second,
+            ToString(client_initial_metadata.find(meta2.first)->second));
   EXPECT_GE(client_initial_metadata.size(), 2);
 
   srv_ctx.AddInitialMetadata(meta3.first, meta3.second);
@@ -1273,12 +1238,10 @@ TEST_P(AsyncEnd2endTest, MetadataRpc) {
   response_writer.SendInitialMetadata(tag(3));
   Verifier().Expect(3, true).Expect(4, true).Verify(cq_.get());
   const auto& server_initial_metadata = cli_ctx.GetServerInitialMetadata();
-  EXPECT_EQ(
-      meta3.second,
-      ToString(server_initial_metadata.equal_range(meta3.first).first->second));
-  EXPECT_EQ(
-      meta4.second,
-      ToString(server_initial_metadata.equal_range(meta4.first).first->second));
+  EXPECT_EQ(meta3.second,
+            ToString(server_initial_metadata.find(meta3.first)->second));
+  EXPECT_EQ(meta4.second,
+            ToString(server_initial_metadata.find(meta4.first)->second));
   EXPECT_GE(server_initial_metadata.size(), 2);
 
   send_response.set_message(recv_request.message());
@@ -1292,14 +1255,10 @@ TEST_P(AsyncEnd2endTest, MetadataRpc) {
   EXPECT_EQ(send_response.message(), recv_response.message());
   EXPECT_TRUE(recv_status.ok());
   const auto& server_trailing_metadata = cli_ctx.GetServerTrailingMetadata();
-  EXPECT_EQ(
-      meta5.second,
-      ToString(
-          server_trailing_metadata.equal_range(meta5.first).first->second));
-  EXPECT_EQ(
-      meta6.second,
-      ToString(
-          server_trailing_metadata.equal_range(meta6.first).first->second));
+  EXPECT_EQ(meta5.second,
+            ToString(server_trailing_metadata.find(meta5.first)->second));
+  EXPECT_EQ(meta6.second,
+            ToString(server_trailing_metadata.find(meta6.first)->second));
   EXPECT_GE(server_trailing_metadata.size(), 2);
 }
 
@@ -1373,9 +1332,6 @@ TEST_P(AsyncEnd2endTest, ServerCheckDone) {
 
 TEST_P(AsyncEnd2endTest, UnimplementedRpc) {
   ChannelArguments args;
-  if (!(GetParam().inproc)) {
-    ApplyCommonChannelArguments(args);
-  }
   const auto& channel_creds = GetCredentialsProvider()->GetChannelCredentials(
       GetParam().credentials_type, &args);
   std::shared_ptr<Channel> channel =

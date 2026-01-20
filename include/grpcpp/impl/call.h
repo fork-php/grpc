@@ -20,6 +20,7 @@
 #define GRPCPP_IMPL_CALL_H
 
 #include <grpc/impl/grpc_types.h>
+#include <grpcpp/impl/call_hook.h>
 
 namespace grpc {
 class CompletionQueue;
@@ -28,29 +29,43 @@ class ClientRpcInfo;
 class ServerRpcInfo;
 }  // namespace experimental
 namespace internal {
+class CallHook;
 class CallOpSetInterface;
 
 /// Straightforward wrapping of the C call object
 class Call final {
  public:
-  Call() : cq_(nullptr), call_(nullptr), max_receive_message_size_(-1) {}
+  Call()
+      : call_hook_(nullptr),
+        cq_(nullptr),
+        call_(nullptr),
+        max_receive_message_size_(-1) {}
   /// call is owned by the caller
-  Call(grpc_call* call, grpc::CompletionQueue* cq)
-      : cq_(cq), call_(call), max_receive_message_size_(-1) {}
+  Call(grpc_call* call, CallHook* call_hook, grpc::CompletionQueue* cq)
+      : call_hook_(call_hook),
+        cq_(cq),
+        call_(call),
+        max_receive_message_size_(-1) {}
 
-  Call(grpc_call* call, grpc::CompletionQueue* cq,
+  Call(grpc_call* call, CallHook* call_hook, grpc::CompletionQueue* cq,
        experimental::ClientRpcInfo* rpc_info)
-      : cq_(cq),
+      : call_hook_(call_hook),
+        cq_(cq),
         call_(call),
         max_receive_message_size_(-1),
         client_rpc_info_(rpc_info) {}
 
-  Call(grpc_call* call, grpc::CompletionQueue* cq, int max_receive_message_size,
-       experimental::ServerRpcInfo* rpc_info)
-      : cq_(cq),
+  Call(grpc_call* call, CallHook* call_hook, grpc::CompletionQueue* cq,
+       int max_receive_message_size, experimental::ServerRpcInfo* rpc_info)
+      : call_hook_(call_hook),
+        cq_(cq),
         call_(call),
         max_receive_message_size_(max_receive_message_size),
         server_rpc_info_(rpc_info) {}
+
+  void PerformOps(CallOpSetInterface* ops) {
+    call_hook_->PerformOpsOnCall(ops, this);
+  }
 
   grpc_call* call() const { return call_; }
   grpc::CompletionQueue* cq() const { return cq_; }
@@ -66,6 +81,7 @@ class Call final {
   }
 
  private:
+  CallHook* call_hook_;
   grpc::CompletionQueue* cq_;
   grpc_call* call_;
   int max_receive_message_size_;

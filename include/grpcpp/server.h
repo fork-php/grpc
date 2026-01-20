@@ -248,6 +248,9 @@ class Server : public ServerInterface, private internal::GrpcLibrary {
     context_allocator_ = std::move(context_allocator);
   }
 
+  void PerformOpsOnCall(internal::CallOpSetInterface* ops,
+                        internal::Call* call) override;
+
   void ShutdownInternal(gpr_timespec deadline)
       ABSL_LOCKS_EXCLUDED(mu_) override;
 

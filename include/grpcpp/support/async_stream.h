@@ -235,7 +235,7 @@ class ClientAsyncReader final : public ClientAsyncReaderInterface<R> {
 
     meta_ops_.set_output_tag(tag);
     meta_ops_.RecvInitialMetadata(context_);
-    meta_ops_.FillOps(&call_);
+    call_.PerformOps(&meta_ops_);
   }
 
   void Read(R* msg, void* tag) override {
@@ -245,7 +245,7 @@ class ClientAsyncReader final : public ClientAsyncReaderInterface<R> {
       read_ops_.RecvInitialMetadata(context_);
     }
     read_ops_.RecvMessage(msg);
-    read_ops_.FillOps(&call_);
+    call_.PerformOps(&read_ops_);
   }
 
   /// See the \a ClientAsyncStreamingInterface.Finish method for semantics.
@@ -260,7 +260,7 @@ class ClientAsyncReader final : public ClientAsyncReaderInterface<R> {
       finish_ops_.RecvInitialMetadata(context_);
     }
     finish_ops_.ClientRecvStatus(context_, status);
-    finish_ops_.FillOps(&call_);
+    call_.PerformOps(&finish_ops_);
   }
 
  private:
@@ -285,7 +285,7 @@ class ClientAsyncReader final : public ClientAsyncReaderInterface<R> {
     init_ops_.SendInitialMetadata(&context_->send_initial_metadata_,
                                   context_->initial_metadata_flags());
     init_ops_.set_output_tag(tag);
-    init_ops_.FillOps(&call_);
+    call_.PerformOps(&init_ops_);
   }
 
   grpc::ChannelInterface* channel_;
@@ -385,7 +385,7 @@ class ClientAsyncWriter final : public ClientAsyncWriterInterface<W> {
 
     meta_ops_.set_output_tag(tag);
     meta_ops_.RecvInitialMetadata(context_);
-    meta_ops_.FillOps(&call_);
+    call_.PerformOps(&meta_ops_);
   }
 
   void Write(const W& msg, void* tag) override {
@@ -393,7 +393,7 @@ class ClientAsyncWriter final : public ClientAsyncWriterInterface<W> {
     write_ops_.set_output_tag(tag);
     // TODO(ctiller): don't assert
     ABSL_CHECK(write_ops_.SendMessage(msg, channel_->memory_allocator()).ok());
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   void Write(const W& msg, grpc::WriteOptions options, void* tag) override {
@@ -408,14 +408,14 @@ class ClientAsyncWriter final : public ClientAsyncWriterInterface<W> {
     ABSL_CHECK(
         write_ops_.SendMessage(msg, options, channel_->memory_allocator())
             .ok());
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   void WritesDone(void* tag) override {
     ABSL_CHECK(started_);
     write_ops_.set_output_tag(tag);
     write_ops_.ClientSendClose();
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   /// See the \a ClientAsyncStreamingInterface.Finish method for semantics.
@@ -432,7 +432,7 @@ class ClientAsyncWriter final : public ClientAsyncWriterInterface<W> {
       finish_ops_.RecvInitialMetadata(context_);
     }
     finish_ops_.ClientRecvStatus(context_, status);
-    finish_ops_.FillOps(&call_);
+    call_.PerformOps(&finish_ops_);
   }
 
  private:
@@ -458,7 +458,7 @@ class ClientAsyncWriter final : public ClientAsyncWriterInterface<W> {
     // buffered up to coalesce with later message send. No op is performed.
     if (!context_->initial_metadata_corked_) {
       write_ops_.set_output_tag(tag);
-      write_ops_.FillOps(&call_);
+      call_.PerformOps(&write_ops_);
     }
   }
 
@@ -557,7 +557,7 @@ class ClientAsyncReaderWriter final
 
     meta_ops_.set_output_tag(tag);
     meta_ops_.RecvInitialMetadata(context_);
-    meta_ops_.FillOps(&call_);
+    call_.PerformOps(&meta_ops_);
   }
 
   void Read(R* msg, void* tag) override {
@@ -567,7 +567,7 @@ class ClientAsyncReaderWriter final
       read_ops_.RecvInitialMetadata(context_);
     }
     read_ops_.RecvMessage(msg);
-    read_ops_.FillOps(&call_);
+    call_.PerformOps(&read_ops_);
   }
 
   void Write(const W& msg, void* tag) override {
@@ -575,7 +575,7 @@ class ClientAsyncReaderWriter final
     write_ops_.set_output_tag(tag);
     // TODO(ctiller): don't assert
     ABSL_CHECK(write_ops_.SendMessage(msg, channel_->memory_allocator()).ok());
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   void Write(const W& msg, grpc::WriteOptions options, void* tag) override {
@@ -589,14 +589,14 @@ class ClientAsyncReaderWriter final
     ABSL_CHECK(
         write_ops_.SendMessage(msg, options, channel_->memory_allocator())
             .ok());
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   void WritesDone(void* tag) override {
     ABSL_CHECK(started_);
     write_ops_.set_output_tag(tag);
     write_ops_.ClientSendClose();
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   /// See the \a ClientAsyncStreamingInterface.Finish method for semantics.
@@ -610,7 +610,7 @@ class ClientAsyncReaderWriter final
       finish_ops_.RecvInitialMetadata(context_);
     }
     finish_ops_.ClientRecvStatus(context_, status);
-    finish_ops_.FillOps(&call_);
+    call_.PerformOps(&finish_ops_);
   }
 
  private:
@@ -633,7 +633,7 @@ class ClientAsyncReaderWriter final
     // buffered up to coalesce with later message send. No op is performed.
     if (!context_->initial_metadata_corked_) {
       write_ops_.set_output_tag(tag);
-      write_ops_.FillOps(&call_);
+      call_.PerformOps(&write_ops_);
     }
   }
 
@@ -714,7 +714,8 @@ class ServerAsyncReaderInterface
 template <class W, class R>
 class ServerAsyncReader final : public ServerAsyncReaderInterface<W, R> {
  public:
-  explicit ServerAsyncReader(grpc::ServerContext* ctx) : call_(), ctx_(ctx) {}
+  explicit ServerAsyncReader(grpc::ServerContext* ctx)
+      : call_(nullptr, nullptr, nullptr), ctx_(ctx) {}
 
   /// See \a ServerAsyncStreamingInterface::SendInitialMetadata for semantics.
   ///
@@ -731,13 +732,13 @@ class ServerAsyncReader final : public ServerAsyncReaderInterface<W, R> {
       meta_ops_.set_compression_level(ctx_->compression_level());
     }
     ctx_->sent_initial_metadata_ = true;
-    meta_ops_.FillOps(&call_);
+    call_.PerformOps(&meta_ops_);
   }
 
   void Read(R* msg, void* tag) override {
     read_ops_.set_output_tag(tag);
     read_ops_.RecvMessage(msg);
-    read_ops_.FillOps(&call_);
+    call_.PerformOps(&read_ops_);
   }
 
   /// See the \a ServerAsyncReaderInterface.Read method for semantics
@@ -769,7 +770,7 @@ class ServerAsyncReader final : public ServerAsyncReaderInterface<W, R> {
     } else {
       finish_ops_.ServerSendStatus(&ctx_->trailing_metadata_, status);
     }
-    finish_ops_.FillOps(&call_);
+    call_.PerformOps(&finish_ops_);
   }
 
   /// See the \a ServerAsyncReaderInterface.Read method for semantics
@@ -793,7 +794,7 @@ class ServerAsyncReader final : public ServerAsyncReaderInterface<W, R> {
       ctx_->sent_initial_metadata_ = true;
     }
     finish_ops_.ServerSendStatus(&ctx_->trailing_metadata_, status);
-    finish_ops_.FillOps(&call_);
+    call_.PerformOps(&finish_ops_);
   }
 
  private:
@@ -861,7 +862,8 @@ class ServerAsyncWriterInterface
 template <class W>
 class ServerAsyncWriter final : public ServerAsyncWriterInterface<W> {
  public:
-  explicit ServerAsyncWriter(grpc::ServerContext* ctx) : call_(), ctx_(ctx) {}
+  explicit ServerAsyncWriter(grpc::ServerContext* ctx)
+      : call_(nullptr, nullptr, nullptr), ctx_(ctx) {}
 
   /// See \a ServerAsyncStreamingInterface::SendInitialMetadata for semantics.
   ///
@@ -880,7 +882,7 @@ class ServerAsyncWriter final : public ServerAsyncWriterInterface<W> {
       meta_ops_.set_compression_level(ctx_->compression_level());
     }
     ctx_->sent_initial_metadata_ = true;
-    meta_ops_.FillOps(&call_);
+    call_.PerformOps(&meta_ops_);
   }
 
   void Write(const W& msg, void* tag) override {
@@ -888,7 +890,7 @@ class ServerAsyncWriter final : public ServerAsyncWriterInterface<W> {
     EnsureInitialMetadataSent(&write_ops_);
     // TODO(ctiller): don't assert
     ABSL_CHECK(write_ops_.SendMessage(msg, ctx_->memory_allocator()).ok());
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   void Write(const W& msg, grpc::WriteOptions options, void* tag) override {
@@ -901,7 +903,7 @@ class ServerAsyncWriter final : public ServerAsyncWriterInterface<W> {
     // TODO(ctiller): don't assert
     ABSL_CHECK(
         write_ops_.SendMessage(msg, options, ctx_->memory_allocator()).ok());
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   /// See the \a ServerAsyncWriterInterface.WriteAndFinish method for semantics.
@@ -922,7 +924,7 @@ class ServerAsyncWriter final : public ServerAsyncWriterInterface<W> {
     ABSL_CHECK(
         write_ops_.SendMessage(msg, options, ctx_->memory_allocator()).ok());
     write_ops_.ServerSendStatus(&ctx_->trailing_metadata_, status);
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   /// See the \a ServerAsyncWriterInterface.Finish method for semantics.
@@ -940,7 +942,7 @@ class ServerAsyncWriter final : public ServerAsyncWriterInterface<W> {
     finish_ops_.set_output_tag(tag);
     EnsureInitialMetadataSent(&finish_ops_);
     finish_ops_.ServerSendStatus(&ctx_->trailing_metadata_, status);
-    finish_ops_.FillOps(&call_);
+    call_.PerformOps(&finish_ops_);
   }
 
  private:
@@ -1029,7 +1031,7 @@ class ServerAsyncReaderWriter final
     : public ServerAsyncReaderWriterInterface<W, R> {
  public:
   explicit ServerAsyncReaderWriter(grpc::ServerContext* ctx)
-      : call_(), ctx_(ctx) {}
+      : call_(nullptr, nullptr, nullptr), ctx_(ctx) {}
 
   /// See \a ServerAsyncStreamingInterface::SendInitialMetadata for semantics.
   ///
@@ -1048,13 +1050,13 @@ class ServerAsyncReaderWriter final
       meta_ops_.set_compression_level(ctx_->compression_level());
     }
     ctx_->sent_initial_metadata_ = true;
-    meta_ops_.FillOps(&call_);
+    call_.PerformOps(&meta_ops_);
   }
 
   void Read(R* msg, void* tag) override {
     read_ops_.set_output_tag(tag);
     read_ops_.RecvMessage(msg);
-    read_ops_.FillOps(&call_);
+    call_.PerformOps(&read_ops_);
   }
 
   void Write(const W& msg, void* tag) override {
@@ -1062,7 +1064,7 @@ class ServerAsyncReaderWriter final
     EnsureInitialMetadataSent(&write_ops_);
     // TODO(ctiller): don't assert
     ABSL_CHECK(write_ops_.SendMessage(msg, ctx_->memory_allocator()).ok());
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   void Write(const W& msg, grpc::WriteOptions options, void* tag) override {
@@ -1073,7 +1075,7 @@ class ServerAsyncReaderWriter final
     EnsureInitialMetadataSent(&write_ops_);
     ABSL_CHECK(
         write_ops_.SendMessage(msg, options, ctx_->memory_allocator()).ok());
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   /// See the \a ServerAsyncReaderWriterInterface.WriteAndFinish
@@ -1095,7 +1097,7 @@ class ServerAsyncReaderWriter final
     ABSL_CHECK(
         write_ops_.SendMessage(msg, options, ctx_->memory_allocator()).ok());
     write_ops_.ServerSendStatus(&ctx_->trailing_metadata_, status);
-    write_ops_.FillOps(&call_);
+    call_.PerformOps(&write_ops_);
   }
 
   /// See the \a ServerAsyncReaderWriterInterface.Finish method for semantics.
@@ -1114,7 +1116,7 @@ class ServerAsyncReaderWriter final
     EnsureInitialMetadataSent(&finish_ops_);
 
     finish_ops_.ServerSendStatus(&ctx_->trailing_metadata_, status);
-    finish_ops_.FillOps(&call_);
+    call_.PerformOps(&finish_ops_);
   }
 
  private:

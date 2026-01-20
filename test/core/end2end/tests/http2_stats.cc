@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #include <grpc/status.h>
-#include <grpc/support/log.h>
-#include <grpc/support/port_platform.h>
 #include <grpc/support/time.h>
 
 #include <functional>
@@ -150,11 +148,6 @@ class FakeCallTracer : public ClientCallTracerInterface {
     std::string SpanId() override { return ""; }
     bool IsSampled() override { return false; }
     void RecordSendInitialMetadata(
-        grpc_metadata_batch* send_initial_metadata) override {
-      GRPC_CHECK(!IsCallTracerSendInitialMetadataIsAnAnnotationEnabled());
-      MutateSendInitialMetadata(send_initial_metadata);
-    }
-    void MutateSendInitialMetadata(
         grpc_metadata_batch* /*send_initial_metadata*/) override {}
     void RecordSendTrailingMetadata(
         grpc_metadata_batch* /*send_trailing_metadata*/) override {}
@@ -239,11 +232,6 @@ class FakeServerCallTracer : public ServerCallTracerInterface {
   }
   ~FakeServerCallTracer() override {}
   void RecordSendInitialMetadata(
-      grpc_metadata_batch* send_initial_metadata) override {
-    GRPC_CHECK(!IsCallTracerSendInitialMetadataIsAnAnnotationEnabled());
-    MutateSendInitialMetadata(send_initial_metadata);
-  }
-  void MutateSendInitialMetadata(
       grpc_metadata_batch* /*send_initial_metadata*/) override {}
   void RecordSendTrailingMetadata(
       grpc_metadata_batch* /*send_trailing_metadata*/) override {}

@@ -24,7 +24,6 @@
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
-#include <grpcpp/support/channel_arguments.h>
 #include <sys/time.h>
 
 #include <thread>
@@ -35,7 +34,6 @@
 #include "src/proto/grpc/testing/echo.grpc.pb.h"
 #include "test/core/test_util/port.h"
 #include "test/core/test_util/test_config.h"
-#include "test/cpp/end2end/end2end_test_utils.h"
 #include "test/cpp/end2end/test_service_impl.h"
 #include "test/cpp/util/subprocess.h"
 #include "gtest/gtest.h"
@@ -94,21 +92,21 @@ namespace testing {
 namespace {
 
 // gpr_now() is called with invalid clock_type
-TEST(TimespecDeathTest, GprNowInvalidClockType) {
+TEST(TimespecTest, GprNowInvalidClockType) {
   // initialize to some junk value
   gpr_clock_type invalid_clock_type = static_cast<gpr_clock_type>(32641);
   EXPECT_DEATH(gpr_now(invalid_clock_type), ".*");
 }
 
 // Add timespan with negative nanoseconds
-TEST(TimespecDeathTest, GprTimeAddNegativeNs) {
+TEST(TimespecTest, GprTimeAddNegativeNs) {
   gpr_timespec now = gpr_now(GPR_CLOCK_MONOTONIC);
   gpr_timespec bad_ts = {1, -1000, GPR_TIMESPAN};
   EXPECT_DEATH(gpr_time_add(now, bad_ts), ".*");
 }
 
 // Subtract timespan with negative nanoseconds
-TEST(TimespecDeathTest, GprTimeSubNegativeNs) {
+TEST(TimespecTest, GprTimeSubNegativeNs) {
   // Nanoseconds must always be positive. Negative timestamps are represented by
   // (negative seconds, positive nanoseconds)
   gpr_timespec now = gpr_now(GPR_CLOCK_MONOTONIC);
@@ -142,10 +140,8 @@ class TimeChangeTest : public ::testing::Test {
     }));
     GRPC_CHECK(server_);
     // connect to server and make sure it's reachable.
-    ChannelArguments args;
-    ApplyCommonChannelArguments(args);
-    auto channel = grpc::CreateCustomChannel(
-        server_address_, InsecureChannelCredentials(), args);
+    auto channel =
+        grpc::CreateChannel(server_address_, InsecureChannelCredentials());
     GRPC_CHECK(channel);
     EXPECT_TRUE(channel->WaitForConnected(
         grpc_timeout_milliseconds_to_deadline(30000)));
@@ -154,10 +150,8 @@ class TimeChangeTest : public ::testing::Test {
   static void TearDownTestSuite() { server_.reset(); }
 
   void SetUp() override {
-    ChannelArguments args;
-    ApplyCommonChannelArguments(args);
-    channel_ = grpc::CreateCustomChannel(server_address_,
-                                         InsecureChannelCredentials(), args);
+    channel_ =
+        grpc::CreateChannel(server_address_, InsecureChannelCredentials());
     GRPC_CHECK(channel_);
     stub_ = grpc::testing::EchoTestService::NewStub(channel_);
   }

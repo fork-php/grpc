@@ -243,7 +243,7 @@ TEST(ChannelInitTest, OrderingConstraintsAreSatisfied) {
             std::vector<std::string>({"c", "b", "a", "terminator"}));
 }
 
-TEST(ChannelInitDeathTest, AmbiguousTopCrashes) {
+TEST(ChannelInitTest, AmbiguousTopCrashes) {
   ChannelInit::Builder b;
   b.RegisterFilter(GRPC_CLIENT_CHANNEL, FilterNamed("c")).FloatToTop();
   b.RegisterFilter(GRPC_CLIENT_CHANNEL, FilterNamed("b")).FloatToTop();
@@ -262,7 +262,7 @@ TEST(ChannelInitTest, ExplicitOrderingBetweenTopResolvesAmbiguity) {
             std::vector<std::string>({"c", "b", "terminator"}));
 }
 
-TEST(ChannelInitDeathTest, AmbiguousBottomCrashes) {
+TEST(ChannelInitTest, AmbiguousBottomCrashes) {
   ChannelInit::Builder b;
   b.RegisterFilter(GRPC_CLIENT_CHANNEL, FilterNamed("c")).SinkToBottom();
   b.RegisterFilter(GRPC_CLIENT_CHANNEL, FilterNamed("b")).SinkToBottom();

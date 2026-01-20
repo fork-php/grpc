@@ -65,7 +65,7 @@ class MockActivity : public Activity, public Wakeable {
 
 TEST(CallStateTest, NoOp) { CallState state; }
 
-TEST(CallStateDeathTest, StartTwiceCrashes) {
+TEST(CallStateTest, StartTwiceCrashes) {
   CallState state;
   state.Start();
   EXPECT_DEATH(state.Start(), "");
@@ -82,7 +82,7 @@ TEST(CallStateTest, PullServerInitialMetadataBlocksUntilStart) {
   EXPECT_THAT(state.PollPullServerInitialMetadataAvailable(), IsReady());
 }
 
-TEST(CallStateDeathTest, PullClientInitialMetadata) {
+TEST(CallStateTest, PullClientInitialMetadata) {
   StrictMock<MockActivity> activity;
   activity.Activate();
   CallState state;
@@ -250,8 +250,7 @@ TEST(CallStateTest, ReceiveTrailersOnlySkipsInitialMetadataOnUnstartedCalls) {
   StrictMock<MockActivity> activity;
   activity.Activate();
   CallState state;
-  // Only cancelled trailing metadata can be pushed on unstarted CallState
-  state.PushServerTrailingMetadata(true);
+  state.PushServerTrailingMetadata(false);
   EXPECT_THAT(state.PollPullServerInitialMetadataAvailable(), IsReady(false));
   state.FinishPullServerInitialMetadata();
   EXPECT_THAT(state.PollServerTrailingMetadataAvailable(), IsReady());
@@ -384,97 +383,6 @@ TEST(CallStateTest, CanSendMessageThenInitialMetadataOnServer) {
   EXPECT_THAT(state.PollPullServerInitialMetadataAvailable(), IsReady());
   state.FinishPullServerInitialMetadata();
   EXPECT_THAT(state.PollPullServerToClientMessageAvailable(), IsReady());
-}
-
-class CallStateParameterizedTest : public ::testing::TestWithParam<bool> {};
-
-TEST_P(CallStateParameterizedTest, ReceiveMessageResultAfterTrailingMetadata) {
-  StrictMock<MockActivity> activity;
-  activity.Activate();
-  CallState state;
-  state.Start();
-  const bool cancel = GetParam();
-
-  // Send client initial metadata
-  state.BeginPullClientInitialMetadata();
-  state.FinishPullClientInitialMetadata();
-  EXPECT_THAT(state.PollPullClientToServerMessageAvailable(), IsPending());
-
-  // Receive server initial metadata
-  EXPECT_THAT(state.PollPullServerInitialMetadataAvailable(), IsPending());
-  EXPECT_WAKEUP(activity,
-                EXPECT_EQ(state.PushServerInitialMetadata(), Success{}));
-
-  EXPECT_THAT(state.PollPullServerInitialMetadataAvailable(), IsReady());
-  state.FinishPullServerInitialMetadata();
-
-  // Server waiting on message
-  EXPECT_THAT(state.PollPullClientToServerMessageAvailable(), IsPending());
-
-  // Server pushes trailing metadata
-  EXPECT_WAKEUP(activity, state.PushServerTrailingMetadata(cancel));
-  EXPECT_THAT(state.PollPullClientToServerMessageAvailable(),
-              IsReady(Failure{}));
-  // Client receives trailing metadata
-  EXPECT_THAT(state.PollServerTrailingMetadataAvailable(), IsReady());
-
-  // Client receives failure on message read
-  if (cancel) {
-    EXPECT_THAT(state.PollPullServerToClientMessageAvailable(),
-                IsReady(Failure{}));
-  } else {
-    EXPECT_THAT(state.PollPullServerToClientMessageAvailable(), IsReady(false));
-  }
-  EXPECT_THAT(state.PollPullServerToClientMessageAvailable(),
-              IsReady(Failure{}));
-}
-
-TEST_P(CallStateParameterizedTest, ReceiveTrailersOnlyAfterStart) {
-  StrictMock<MockActivity> activity;
-  activity.Activate();
-  CallState state;
-  state.Start();
-  const bool cancel = GetParam();
-
-  // Client waiting on initial metadata and message
-  EXPECT_THAT(state.PollPullServerInitialMetadataAvailable(), IsPending());
-  EXPECT_THAT(state.PollPullServerToClientMessageAvailable(), IsPending());
-
-  // Server pushes trailing metadata
-  EXPECT_WAKEUP(activity, state.PushServerTrailingMetadata(cancel));
-
-  EXPECT_THAT(state.PollPullServerInitialMetadataAvailable(), IsReady(false));
-  if (cancel) {
-    EXPECT_WAKEUP(activity,
-                  EXPECT_THAT(state.PollPullServerToClientMessageAvailable(),
-                              IsReady(Failure{})));
-  } else {
-    EXPECT_WAKEUP(activity,
-                  EXPECT_THAT(state.PollPullServerToClientMessageAvailable(),
-                              IsReady(false)));
-  }
-}
-
-INSTANTIATE_TEST_SUITE_P(CallStateParameterized, CallStateParameterizedTest,
-                         ::testing::Bool());
-
-TEST(CallStateTest, ReceiveTrailersOnlyBeforeStart) {
-  StrictMock<MockActivity> activity;
-  activity.Activate();
-  CallState state;
-
-  // Client waiting on initial metadata and message
-  EXPECT_THAT(state.PollPullServerInitialMetadataAvailable(), IsPending());
-  EXPECT_THAT(state.PollPullServerToClientMessageAvailable(), IsPending());
-
-  // Server pushes cancelled trailing metadata
-  EXPECT_WAKEUP(activity, state.PushServerTrailingMetadata(/*cancel=*/true));
-
-  EXPECT_WAKEUP(activity,
-                EXPECT_THAT(state.PollPullServerInitialMetadataAvailable(),
-                            IsReady(false)));
-  EXPECT_THAT(state.PollPullServerToClientMessageAvailable(),
-              IsReady(Failure{}));
 }
 
 }  // namespace grpc_core

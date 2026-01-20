@@ -467,6 +467,7 @@ GRPCXX_PUBLIC_HDRS = [
     "include/grpcpp/generic/generic_stub_callback.h",
     "include/grpcpp/grpcpp.h",
     "include/grpcpp/health_check_service_interface.h",
+    "include/grpcpp/impl/call_hook.h",
     "include/grpcpp/impl/call_op_set_interface.h",
     "include/grpcpp/impl/call_op_set.h",
     "include/grpcpp/impl/call.h",
@@ -536,6 +537,7 @@ GRPCXX_PUBLIC_HDRS = [
     "include/grpc++/impl/codegen/async_stream.h",
     "include/grpc++/impl/codegen/async_unary_call.h",
     "include/grpc++/impl/codegen/byte_buffer.h",
+    "include/grpc++/impl/codegen/call_hook.h",
     "include/grpc++/impl/codegen/call.h",
     "include/grpc++/impl/codegen/channel_interface.h",
     "include/grpc++/impl/codegen/client_context.h",
@@ -564,6 +566,7 @@ GRPCXX_PUBLIC_HDRS = [
     "include/grpcpp/impl/codegen/async_stream.h",
     "include/grpcpp/impl/codegen/async_unary_call.h",
     "include/grpcpp/impl/codegen/byte_buffer.h",
+    "include/grpcpp/impl/codegen/call_hook.h",
     "include/grpcpp/impl/codegen/call_op_set_interface.h",
     "include/grpcpp/impl/codegen/call_op_set.h",
     "include/grpcpp/impl/codegen/call.h",
@@ -643,7 +646,7 @@ grpc_cc_library(
         "grpc_http_filters",
         "grpc_security_base",
         "grpc_trace",
-        "http_connect_client_handshaker",
+        "http_connect_handshaker",
         "iomgr_timer",
         "server",
         "transport_auth_context",
@@ -740,7 +743,7 @@ grpc_cc_library(
         "grpc_public_hdrs",
         "grpc_security_base",
         "grpc_trace",
-        "http_connect_client_handshaker",
+        "http_connect_handshaker",
         "httpcli",
         "iomgr_timer",
         "promise",
@@ -1703,10 +1706,8 @@ grpc_cc_library(
         "//src/core:telemetry/call_tracer.h",
     ],
     external_deps = [
-        "absl/functional:function_ref",
         "absl/status",
         "absl/strings",
-        "absl/types:span",
     ],
     visibility = ["//bazel:alt_grpc_base_legacy"],
     deps = [
@@ -1716,7 +1717,6 @@ grpc_cc_library(
         "//src/core:channel_args",
         "//src/core:context",
         "//src/core:error",
-        "//src/core:experiments",
         "//src/core:grpc_check",
         "//src/core:message",
         "//src/core:metadata_batch",
@@ -2516,7 +2516,6 @@ grpc_cc_library(
     name = "grpc_core_credentials_header",
     hdrs = [
         "include/grpc/credentials.h",
-        "include/grpc/credentials_cpp.h",
     ],
     external_deps = [
         "absl/base:core_headers",
@@ -3497,9 +3496,9 @@ grpc_cc_library(
 )
 
 grpc_cc_library(
-    name = "http_connect_client_handshaker",
+    name = "http_connect_handshaker",
     srcs = [
-        "//src/core:handshaker/http_connect/http_connect_client_handshaker.cc",
+        "//src/core:handshaker/http_connect/http_connect_handshaker.cc",
     ],
     external_deps = [
         "absl/base:core_headers",
@@ -3508,7 +3507,7 @@ grpc_cc_library(
         "absl/strings",
     ],
     public_hdrs = [
-        "//src/core:handshaker/http_connect/http_connect_client_handshaker.h",
+        "//src/core:handshaker/http_connect/http_connect_handshaker.h",
     ],
     visibility = ["//bazel:alt_grpc_base_legacy"],
     deps = [

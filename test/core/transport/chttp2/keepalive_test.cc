@@ -88,17 +88,6 @@ class MockKeepAliveInterface : public KeepAliveInterface {
   }
 };
 
-void MaybeSpawnKeepaliveLoop(KeepaliveManager& keepalive_manager,
-                             Party* party) {
-  if (keepalive_manager.IsKeepAliveLoopNeeded()) {
-    party->Spawn(
-        "KeepaliveLoop", [&]() { return keepalive_manager.KeepaliveLoop(); },
-        [](absl::Status status) {
-          LOG(INFO) << "KeepaliveLoop end with status: " << status;
-        });
-  }
-}
-
 class KeepaliveManagerTest : public YodelTest {
  protected:
   using YodelTest::YodelTest;
@@ -133,8 +122,8 @@ YODEL_TEST(KeepaliveManagerTest, TestKeepAlive) {
                                                       /*return_value=*/true);
 
   KeepaliveManager keep_alive_system(std::move(keep_alive_interface),
-                                     keepalive_timeout, keepalive_interval);
-  MaybeSpawnKeepaliveLoop(keep_alive_system, GetParty());
+                                     keepalive_timeout, keepalive_interval,
+                                     GetParty());
 
   WaitForAllPendingWork();
   event_engine()->TickUntilIdle();
@@ -142,8 +131,8 @@ YODEL_TEST(KeepaliveManagerTest, TestKeepAlive) {
 }
 
 YODEL_TEST(KeepaliveManagerTest, TestKeepAliveTimeout) {
-  // Simple test to simulate sending a keepalive ping and not receiving any
-  // data within the keepalive timeout. The test asserts that:
+  // Simple test to simulate sending a keepalive ping and not receiving any data
+  // within the keepalive timeout. The test asserts that:
   // 1. The keepalive timeout is triggered.
   // 2. The keepalive ping is sent.
   InitParty();
@@ -159,8 +148,8 @@ YODEL_TEST(KeepaliveManagerTest, TestKeepAliveTimeout) {
                                                       /*return_value=*/true);
 
   KeepaliveManager keep_alive_system(std::move(keep_alive_interface),
-                                     keepalive_timeout, keepalive_interval);
-  MaybeSpawnKeepaliveLoop(keep_alive_system, GetParty());
+                                     keepalive_timeout, keepalive_interval,
+                                     GetParty());
 
   WaitForAllPendingWork();
   event_engine()->TickUntilIdle();
@@ -170,8 +159,7 @@ YODEL_TEST(KeepaliveManagerTest, TestKeepAliveTimeout) {
 YODEL_TEST(KeepaliveManagerTest, TestKeepAliveWithData) {
   // Test to simulate reading of data at certain intervals. The test asserts
   // that:
-  // 1. The keepalive ping is not sent as long as there is data read within
-  // the
+  // 1. The keepalive ping is not sent as long as there is data read within the
   //    keepalive interval.
   InitParty();
   int end_after = 1;
@@ -187,8 +175,8 @@ YODEL_TEST(KeepaliveManagerTest, TestKeepAliveWithData) {
                                                       /*return_value=*/true);
 
   KeepaliveManager keep_alive_system(std::move(keep_alive_interface),
-                                     keepalive_timeout, keepalive_interval);
-  MaybeSpawnKeepaliveLoop(keep_alive_system, GetParty());
+                                     keepalive_timeout, keepalive_interval,
+                                     GetParty());
 
   GetParty()->Spawn(
       "ReadData", Loop([&read_loop_end_after, &keep_alive_system]() {
@@ -212,8 +200,7 @@ YODEL_TEST(KeepaliveManagerTest, TestKeepAliveWithData) {
 YODEL_TEST(KeepaliveManagerTest, TestKeepAliveTimeoutWithData) {
   // Test to simulate reading of data at certain intervals. The test asserts
   // that:
-  // 1. The keepalive ping is not sent as long as there is data read within
-  // the
+  // 1. The keepalive ping is not sent as long as there is data read within the
   //    keepalive interval.
   // 2. Keepalive timeout is triggered once no data is read within the
   //    keepalive timeout.
@@ -232,8 +219,8 @@ YODEL_TEST(KeepaliveManagerTest, TestKeepAliveTimeoutWithData) {
                                                       /*return_value=*/true);
 
   KeepaliveManager keep_alive_system(std::move(keep_alive_interface),
-                                     keepalive_timeout, keepalive_interval);
-  MaybeSpawnKeepaliveLoop(keep_alive_system, GetParty());
+                                     keepalive_timeout, keepalive_interval,
+                                     GetParty());
 
   GetParty()->Spawn(
       "ReadData", Loop([&read_loop_end_after, &keep_alive_system]() {

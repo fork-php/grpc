@@ -27,7 +27,6 @@
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
 #include <grpcpp/server_posix.h>
-#include <grpcpp/support/channel_arguments.h>
 #include <grpcpp/support/client_interceptor.h>
 
 #include <memory>
@@ -38,7 +37,6 @@
 #include "src/proto/grpc/testing/echo.grpc.pb.h"
 #include "test/core/test_util/port.h"
 #include "test/core/test_util/test_config.h"
-#include "test/cpp/end2end/end2end_test_utils.h"
 #include "test/cpp/end2end/interceptors_util.h"
 #include "test/cpp/end2end/test_service_impl.h"
 #include "test/cpp/util/byte_buffer_proto_helper.h"
@@ -768,17 +766,15 @@ class ParameterizedClientInterceptorsEnd2endTest
       std::vector<std::unique_ptr<
           grpc::experimental::ClientInterceptorFactoryInterface>>
           creators) {
-    ChannelArguments args;
-    ApplyCommonChannelArguments(args);
     if (GetParam().channel_type() == ChannelType::kHttpChannel) {
       return experimental::CreateCustomChannelWithInterceptors(
-          server_address_, InsecureChannelCredentials(), args,
+          server_address_, InsecureChannelCredentials(), ChannelArguments(),
           std::move(creators));
     }
 #ifdef GRPC_POSIX_SOCKET
     else if (GetParam().channel_type() == ChannelType::kFdChannel) {
       return experimental::CreateCustomInsecureChannelWithInterceptorsFromFd(
-          "", sv_[0], args, std::move(creators));
+          "", sv_[0], ChannelArguments(), std::move(creators));
     }
 #endif  // GRPC_POSIX_SOCKET
     return nullptr;
@@ -1032,7 +1028,6 @@ class ClientInterceptorsStreamingEnd2endTest : public ::testing::Test {
 
 TEST_F(ClientInterceptorsStreamingEnd2endTest, ClientStreamingTest) {
   ChannelArguments args;
-  ApplyCommonChannelArguments(args);
   PhonyInterceptor::Reset();
   std::vector<std::unique_ptr<experimental::ClientInterceptorFactoryInterface>>
       creators;
@@ -1125,7 +1120,6 @@ TEST_F(ClientInterceptorsStreamingEnd2endTest,
 
 TEST_F(ClientInterceptorsStreamingEnd2endTest, BidiStreamingHijackingTest) {
   ChannelArguments args;
-  ApplyCommonChannelArguments(args);
   PhonyInterceptor::Reset();
   std::vector<std::unique_ptr<experimental::ClientInterceptorFactoryInterface>>
       creators;
@@ -1138,7 +1132,6 @@ TEST_F(ClientInterceptorsStreamingEnd2endTest, BidiStreamingHijackingTest) {
 
 TEST_F(ClientInterceptorsStreamingEnd2endTest, BidiStreamingTest) {
   ChannelArguments args;
-  ApplyCommonChannelArguments(args);
   PhonyInterceptor::Reset();
   std::vector<std::unique_ptr<experimental::ClientInterceptorFactoryInterface>>
       creators;

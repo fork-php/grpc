@@ -22,7 +22,6 @@
 #include <grpc/support/string_util.h>
 #include <grpcpp/ext/server_load_reporting.h>
 #include <grpcpp/server_builder.h>
-#include <grpcpp/support/channel_arguments.h>
 
 #include <thread>
 
@@ -33,7 +32,6 @@
 #include "src/proto/grpc/testing/echo.grpc.pb.h"
 #include "test/core/test_util/port.h"
 #include "test/core/test_util/test_config.h"
-#include "test/cpp/end2end/end2end_test_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
@@ -96,10 +94,8 @@ class ServerLoadReportingEnd2endTest : public ::testing::Test {
 
   void ClientMakeEchoCalls(const std::string& lb_id, const std::string& lb_tag,
                            const std::string& message, size_t num_requests) {
-    ChannelArguments args;
-    ApplyCommonChannelArguments(args);
-    auto stub = EchoTestService::NewStub(grpc::CreateCustomChannel(
-        server_address_, InsecureChannelCredentials(), args));
+    auto stub = EchoTestService::NewStub(
+        grpc::CreateChannel(server_address_, InsecureChannelCredentials()));
     std::string lb_token = lb_id + lb_tag;
     for (size_t i = 0; i < num_requests; ++i) {
       ClientContext ctx;
@@ -128,10 +124,8 @@ class ServerLoadReportingEnd2endTest : public ::testing::Test {
 TEST_F(ServerLoadReportingEnd2endTest, NoCall) {}
 
 TEST_F(ServerLoadReportingEnd2endTest, BasicReport) {
-  ChannelArguments args;
-  ApplyCommonChannelArguments(args);
-  auto channel = grpc::CreateCustomChannel(server_address_,
-                                           InsecureChannelCredentials(), args);
+  auto channel =
+      grpc::CreateChannel(server_address_, InsecureChannelCredentials());
   auto stub = grpc::lb::v1::LoadReporter::NewStub(channel);
   ClientContext ctx;
   auto stream = stub->ReportLoad(&ctx);

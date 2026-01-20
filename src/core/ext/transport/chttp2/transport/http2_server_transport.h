@@ -194,6 +194,8 @@ class Http2ServerTransport final : public ServerTransport {
   // stream_id);
 };
 
+GRPC_CHECK_CLASS_SIZE(Http2ServerTransport, 240);
+
 }  // namespace http2
 }  // namespace grpc_core
 

@@ -18,7 +18,6 @@
 
 #include "src/cpp/ext/otel/otel_server_call_tracer.h"
 
-#include <grpc/support/log.h>
 #include <grpc/support/port_platform.h>
 
 #include <array>
@@ -42,7 +41,6 @@
 #include "src/core/lib/surface/call.h"
 #include "src/core/lib/transport/transport.h"
 #include "src/core/telemetry/tcp_tracer.h"
-#include "src/core/util/grpc_check.h"
 #include "src/cpp/ext/otel/key_value_iterable.h"
 #include "src/cpp/ext/otel/otel_plugin.h"
 #include "absl/functional/any_invocable.h"
@@ -202,13 +200,6 @@ void OpenTelemetryPluginImpl::ServerCallTracerInterface::
 
 void OpenTelemetryPluginImpl::ServerCallTracerInterface::
     RecordSendInitialMetadata(grpc_metadata_batch* send_initial_metadata) {
-  GRPC_CHECK(
-      !grpc_core::IsCallTracerSendInitialMetadataIsAnAnnotationEnabled());
-  MutateSendInitialMetadata(send_initial_metadata);
-}
-
-void OpenTelemetryPluginImpl::ServerCallTracerInterface::
-    MutateSendInitialMetadata(grpc_metadata_batch* send_initial_metadata) {
   scope_config_->active_plugin_options_view().ForEach(
       [&](const InternalOpenTelemetryPluginOption& plugin_option,
           size_t index) {
@@ -316,18 +307,6 @@ void OpenTelemetryPluginImpl::ServerCallTracerInterface::RecordIncomingBytes(
 void OpenTelemetryPluginImpl::ServerCallTracerInterface::RecordOutgoingBytes(
     const TransportByteSize& transport_byte_size) {
   outgoing_bytes_.fetch_add(transport_byte_size.data_bytes);
-}
-
-void OpenTelemetryPluginImpl::ServerCallTracerInterface::RecordAnnotation(
-    const Annotation& annotation) {
-  if (annotation.type() == grpc_core::CallTracerAnnotationInterface::
-                               AnnotationType::kSendInitialMetadata) {
-    // Otel does not have any immutable tracing for send initial metadata.
-    // All Otel work for send initial metadata is mutation, which is handled in
-    // MutateSendInitialMetadata.
-    return;
-  }
-  RecordAnnotation(annotation.ToString());
 }
 
 void OpenTelemetryPluginImpl::ServerCallTracerInterface::RecordAnnotation(

@@ -27,13 +27,11 @@
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
-#include <grpcpp/support/channel_arguments.h>
 
 #include "src/core/util/crash.h"
 #include "src/proto/grpc/testing/echo.grpc.pb.h"
 #include "test/core/test_util/port.h"
 #include "test/core/test_util/test_config.h"
-#include "test/cpp/end2end/end2end_test_utils.h"
 #include "test/cpp/util/string_ref_helper.h"
 #include "gtest/gtest.h"
 
@@ -101,8 +99,8 @@ class TestServiceImpl : public grpc::testing::EchoTestService::Service {
   int GetIntValueFromMetadata(ServerContext* context, const char* key,
                               int default_value) {
     auto metadata = context->client_metadata();
-    if (auto [it, end] = metadata.equal_range(key); it != end) {
-      std::istringstream iss(ToString(it->second));
+    if (metadata.find(key) != metadata.end()) {
+      std::istringstream iss(ToString(metadata.find(key)->second));
       iss >> default_value;
     }
     return default_value;
@@ -123,10 +121,8 @@ class ServerEarlyReturnTest : public ::testing::Test {
     builder.RegisterService(&service_);
     server_ = builder.BuildAndStart();
 
-    ChannelArguments args;
-    ApplyCommonChannelArguments(args);
-    channel_ = grpc::CreateCustomChannel(server_address_.str(),
-                                         InsecureChannelCredentials(), args);
+    channel_ = grpc::CreateChannel(server_address_.str(),
+                                   InsecureChannelCredentials());
     stub_ = grpc::testing::EchoTestService::NewStub(channel_);
   }
 

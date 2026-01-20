@@ -50,7 +50,6 @@ cc_library(
     includes = ["."],
     deps = [
         "//:grpc_base",
-        "//src/core:grpc_check",
     ],
 )
 

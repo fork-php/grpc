@@ -15,7 +15,6 @@
 #include "src/core/channelz/v2tov1/property_list.h"
 
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <string>
 

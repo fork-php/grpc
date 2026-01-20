@@ -34,7 +34,6 @@
 #include "src/core/credentials/call/external/url_external_account_credentials.h"
 #include "src/core/credentials/call/json_util.h"
 #include "src/core/credentials/transport/transport_credentials.h"
-#include "src/core/lib/transport/status_conversion.h"
 #include "src/core/util/grpc_check.h"
 #include "src/core/util/http_client/httpcli_ssl_credentials.h"
 #include "src/core/util/http_client/parser.h"
@@ -109,13 +108,7 @@ void ExternalAccountCredentials::HttpFetchBody::OnHttpResponse(
   absl::string_view response_body(self->response_.body,
                                   self->response_.body_length);
   if (self->response_.status != 200) {
-    grpc_status_code status_code =
-        grpc_http2_status_to_grpc_status(self->response_.status);
-    if (status_code != GRPC_STATUS_UNAVAILABLE) {
-      status_code = GRPC_STATUS_UNAUTHENTICATED;
-    }
-    self->Finish(absl::Status(
-        static_cast<absl::StatusCode>(status_code),
+    self->Finish(absl::UnavailableError(
         absl::StrCat("Call to HTTP server ended with status ",
                      self->response_.status, " [", response_body, "]")));
     return;
@@ -187,7 +180,7 @@ void ExternalAccountCredentials::ExternalFetchRequest::ExchangeToken(
   // Parse URI.
   absl::StatusOr<URI> uri = URI::Parse(options().token_url);
   if (!uri.ok()) {
-    return FinishTokenFetch(absl::UnauthenticatedError(
+    return FinishTokenFetch(GRPC_ERROR_CREATE(
         absl::StrFormat("Invalid token url: %s. Error: %s", options().token_url,
                         uri.status().ToString())));
   }
@@ -291,7 +284,7 @@ void ExternalAccountCredentials::ExternalFetchRequest::
   }
   auto it = json->object().find("access_token");
   if (it == json->object().end() || it->second.type() != Json::Type::kString) {
-    FinishTokenFetch(absl::UnauthenticatedError(absl::StrFormat(
+    FinishTokenFetch(GRPC_ERROR_CREATE(absl::StrFormat(
         "Missing or invalid access_token in %s.", *response_body)));
     return;
   }
@@ -299,7 +292,7 @@ void ExternalAccountCredentials::ExternalFetchRequest::
   absl::StatusOr<URI> uri =
       URI::Parse(options().service_account_impersonation_url);
   if (!uri.ok()) {
-    FinishTokenFetch(absl::UnauthenticatedError(absl::StrFormat(
+    FinishTokenFetch(GRPC_ERROR_CREATE(absl::StrFormat(
         "Invalid service account impersonation url: %s. Error: %s",
         options().service_account_impersonation_url, uri.status().ToString())));
     return;

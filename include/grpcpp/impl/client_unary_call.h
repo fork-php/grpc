@@ -77,7 +77,7 @@ class BlockingUnaryCallImpl {
     ops.AllowNoMessage();
     ops.ClientSendClose();
     ops.ClientRecvStatus(context, &status_);
-    ops.FillOps(&call);
+    call.PerformOps(&ops);
     cq.Pluck(&ops);
     // Some of the ops might fail. If the ops fail in the core layer, status
     // would reflect the error. But, if the ops fail in the C++ layer, the
